@@ -12,7 +12,7 @@ permissions:
 
 concurrency:
   group: "pages"
-  cancel-in-progress: false
+  cancel-in-progress: true  # 修正为 true 更合理
 
 jobs:
   build:
@@ -25,10 +25,32 @@ jobs:
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.1'
-          bundler-version: '2.0.0.pre.3'  # 强制使用兼容的 Bundler 版本
-          bundler-cache: false
+          # 修正：使用正确的参数名 'bundler' 而不是 'bundler-version'
+          bundler: '2.0.0.pre.3'
+          bundler-cache: true  # 启用缓存加快构建
           cache-version: 2
 
       - name: Install system dependencies
         run: |
           sudo apt-get update
+          sudo apt-get install -y build-essential zlib1g-dev
+          
+      - name: Install Jekyll dependencies
+        run: |
+          gem install bundler
+          bundle install
+
+      - name: Build site
+        run: |
+          bundle exec jekyll build --destination ./_site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v3  # 使用官方部署动作
