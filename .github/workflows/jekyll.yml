@@ -21,47 +21,45 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         
-      # 关键修复：更新Bundler版本解决兼容性问题
-      - name: Setup Ruby and Bundler
+      # 修复1: 确保使用兼容的 Bundler 版本
+      - name: Setup Ruby
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.1'
-          bundler-version: '>=2.3.22'  # 指定与Ruby 3.1兼容的Bundler版本
-          bundler-cache: false         # 禁用初始缓存，手动处理
-          cache-version: 1             # 更新缓存版本强制刷新
+          bundler-version: '2.3.26'  # 明确指定兼容版本
+          bundler-cache: false       # 禁用自动缓存，手动处理
+          cache-version: 2           # 更新缓存版本强制刷新
           
-      # 清理旧缓存和配置
-      - name: Reset Bundle Environment
+      # 修复2: 解决平台参数问题
+      - name: Install Dependencies with Platform Fix
         run: |
-          # 移除可能导致问题的旧缓存
-          rm -rf vendor/bundle
-          # 删除所有bundler本地配置
-          bundle config --delete path
-          bundle config --delete deployment
-          # 设置正确的缓存路径
-          bundle config set --local path 'vendor/bundle'
+          # 解决平台问题的替代方案
+          bundle config set --local force_ruby_platform true
           
-      # 安全安装依赖
-      - name: Install Dependencies
+          # 安装依赖，使用--force参数覆盖潜在问题
+          bundle install --jobs 4 --retry 3 --force
+          
+          # 验证安装
+          bundle info
+          
+      # 修复3: 配置缓存路径（Bundler 2.x兼容方式）
+      - name: Configure Bundle Path
         run: |
-          # 确保使用指定版本的bundler
-          gem install bundler -v '~>2.3'
-          # 解决平台兼容问题
-          bundle lock --add-platform ruby
-          bundle lock --add-platform x86_64-linux
-          # 带重试机制的安装
-          bundle install --jobs 4 --retry 3
+          # 替代 --path 参数的设置方式
+          bundle config --local path vendor/bundle
+          echo "BUNDLE_PATH set to: vendor/bundle"
           
       - name: Setup Pages
         id: pages
         uses: actions/configure-pages@v5
         
-      # 添加诊断日志
+      # 添加环境验证
       - name: Verify Environment
         run: |
           echo "Ruby version: $(ruby -v)"
           echo "Bundler version: $(bundle -v)"
           bundle list
+          bundle config list
 
       - name: Build with Jekyll
         run: bundle exec jekyll build --baseurl "${{ steps.pages.outputs.base_path }}" --trace
